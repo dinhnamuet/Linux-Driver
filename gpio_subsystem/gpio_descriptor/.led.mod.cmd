@@ -1,0 +1,1 @@
+cmd_/home/nam/Desktop/linux-porting-and_driver/gpio_subsystem/gpio_descriptor/led.mod := { echo  /home/nam/Desktop/linux-porting-and_driver/gpio_subsystem/gpio_descriptor/led.o;  echo; } > /home/nam/Desktop/linux-porting-and_driver/gpio_subsystem/gpio_descriptor/led.mod
