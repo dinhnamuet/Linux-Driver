@@ -16,7 +16,6 @@
 
 void workqueue_func(struct work_struct *work);
 DECLARE_WORK(workqueue, workqueue_func);
-
 struct LoRa
 {
     int irq;
@@ -32,6 +31,8 @@ struct LoRa
     char *transmit_buffer;
     uint8_t rssi_value;
     dev_t dev_num;
+	int major_number;
+	char name[10];
 
     struct spi_device *spi;
     struct gpio_desc *reset;
@@ -226,14 +227,23 @@ static int sx1278_probe(struct spi_device *spi)
     if(LoRa_init(sx1278) != LORA_OK)
     {
         printk(KERN_ERR "LoRa init failure\n");
-        LoRa_free(sx1278);
-        return -1;
+        goto rm_buff_trans;
     }
+	memset(sx1278->name, 0, sizeof(sx1278->name));
+	sprintf(sx1278->name, "%s-%d", DEV_NAME, sx1278->spi->chip_select);
+	sx1278->major_number = register_chrdev(0, sx1278->name, &fops);
+	if(sx1278->major_number < 0)
+	{
+		printk(KERN_ERR "Register device failed\n");
+		goto rm_buff_trans;
+	}
     LoRa_startReceiving(sx1278);
     printk(KERN_INFO "LoRa init success!\n");
     printk(KERN_INFO "%s, %d\n", __func__, __LINE__);
     spi_set_drvdata(spi, sx1278);
     return 0;
+rm_buff_trans:
+	kfree(sx1278->transmit_buffer);
 rm_buff_rec:
 	kfree(sx1278->receive_buffer);
 	LoRa_free(sx1278);
@@ -252,6 +262,7 @@ static int sx1278_remove(struct spi_device *spi)
 	kfree(sx1278->transmit_buffer);
     gpiod_set_value(sx1278->reset, 0);
     LoRa_free(sx1278);
+	unregister_chrdev(sx1278->major_number, sx1278->name);
     return 0;
 }
 

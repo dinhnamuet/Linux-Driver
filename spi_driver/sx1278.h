@@ -13,7 +13,7 @@
 #define RXSINGLE_SET _IO('U', 17)
 #define GET_RSSI _IOW('a', '1', uint8_t *)
 
-#define DEV_NAME		"sx-1278"
+#define DEV_NAME		"lora"
 /* lora register address */
 #define RegFifo						0x00
 #define RegOpMode					0x01
