@@ -41,7 +41,7 @@ struct LoRa
     struct device *mdevice;
 };
 
-struct task_struct *task = NULL;
+struct task_struct *task;
 static void LoRa_Reset(struct LoRa *_LoRa);
 static uint8_t LoRa_Read(struct LoRa *_LoRa, uint8_t address);
 static void LoRa_Write(struct LoRa *_LoRa, uint8_t address, uint8_t value);
@@ -59,7 +59,6 @@ static uint8_t LoRa_receive(struct LoRa *_LoRa, uint8_t *data, uint8_t length);
 static uint8_t LoRa_getRSSI(struct LoRa *_LoRa);
 static uint16_t LoRa_init(struct LoRa *_LoRa);
 static void LoRa_free(struct LoRa *_LoRa);
-
 
 irqreturn_t get_message(int irq, void *dev_id)
 {
@@ -81,6 +80,104 @@ void workqueue_func(struct work_struct *work)
 			printk(KERN_INFO "Signal was sent to %d\n", task->pid);
 	}
 }
+static int sx1278_open(struct inode *inodep, struct file *filep)
+{
+	struct spi_device *spi = container_of(inodep->i_private, struct spi_device, dev);
+    struct LoRa *lora = spi_get_drvdata(spi);
+	if (!lora) 
+	{
+        printk(KERN_ERR "Failed to get LoRa data\n");
+        return -EINVAL;
+    }
+	filep->private_data = lora;
+	printk(KERN_INFO "Device %s opened\n", filep->f_path.dentry->d_name.name);
+	return 0;
+}
+static int sx1278_close(struct inode *inodep, struct file *filep)
+{
+	filep->private_data = NULL;
+	return 0;
+}
+static ssize_t sx1278_read(struct file *filep, char __user *user_buff, size_t size, loff_t *offset)
+{
+	int to_read = 0;
+	uint8_t r;
+	struct LoRa *lora = filep->private_data;
+	memset(lora->receive_buffer, 0, PACKET_SIZE);
+	r = LoRa_receive(lora, lora->receive_buffer, PACKET_SIZE);
+	if(r)
+	{
+		to_read = (size > strlen(lora->receive_buffer) - *offset) ? (strlen(lora->receive_buffer) - *offset) : (size);
+		if(copy_to_user(user_buff, lora->receive_buffer, strlen(lora->receive_buffer)) != 0)
+		{
+			return -EFAULT;
+		}
+		*offset += to_read;
+		printk(KERN_INFO "received: %s\n", &lora->receive_buffer[10]);
+	}
+	return to_read;
+}
+static ssize_t sx1278_write(struct file *filep, const char *user_buff, size_t size, loff_t *offset)
+{
+	struct LoRa *sx1278 = filep->private_data;
+	memset(sx1278->transmit_buffer, 0, PACKET_SIZE);
+	if(copy_from_user(sx1278->transmit_buffer, user_buff, size) != 0)
+		return -EFAULT;
+	LoRa_transmit(sx1278, sx1278->transmit_buffer, (uint8_t)strlen(sx1278->transmit_buffer), TX_TIME_OUT);
+	printk(KERN_INFO "transmit: %s\n", sx1278->transmit_buffer);
+	return size;
+}
+static long sx1278_ioctl(struct file *filep, unsigned int cmd, unsigned long data)
+{
+	struct LoRa *sx1278 = filep->private_data;
+	switch(cmd)
+	{
+		case RG_SIGNAL:
+			task = get_current();
+			printk(KERN_INFO "process with pid %d registerd to recv signal\n", task->pid);
+			break;
+		case CTL_SIGNAL:
+			printk(KERN_INFO "process wid pid %d stop recv signal\n", task->pid);
+		    task = NULL;
+			break;
+		case GET_RSSI:
+			sx1278->rssi_value = LoRa_getRSSI(sx1278);
+			if(copy_to_user((uint8_t *)data, &sx1278->rssi_value, 1) != 0)
+			{
+				printk(KERN_ERR "Get RSSI failure\n");
+				return -1;
+			}
+			break;
+		case SLEEP_SET:
+			LoRa_gotoMode(sx1278, SLEEP_MODE);
+			break;
+		case STANDBY_SET:
+			LoRa_gotoMode(sx1278, STANDBY_MODE);
+			break;
+		case TRANSMIT_SET:
+			LoRa_gotoMode(sx1278, TRANSMIT_MODE);
+			break;
+		case RXCONTINOUS_SET:
+			LoRa_gotoMode(sx1278, RXCONTINUOUS_MODE);
+			break;
+		case RXSINGLE_SET:
+			LoRa_gotoMode(sx1278, RXSINGLE_MODE);
+			break;
+		default:
+			break;
+	}
+	return 0;
+}
+
+static struct file_operations fops = {
+	.owner = THIS_MODULE,
+	.open		= sx1278_open,
+	.release	= sx1278_close,
+	.read		= sx1278_read,
+	.write		= sx1278_write,
+	.unlocked_ioctl	= sx1278_ioctl
+};
+
 static int sx1278_probe(struct spi_device *spi)
 {
     struct LoRa *sx1278 = NULL;
@@ -107,6 +204,18 @@ static int sx1278_probe(struct spi_device *spi)
         printk(KERN_ERR "SPI setup failed\n");
         return -1;
     }
+	sx1278->receive_buffer = kzalloc(PACKET_SIZE, GFP_KERNEL);
+	if(sx1278->receive_buffer == NULL)
+	{
+		printk(KERN_ERR "Allocate memory failure\n");
+		return -1;
+	}
+	sx1278->transmit_buffer = kzalloc(PACKET_SIZE, GFP_KERNEL);
+	if(sx1278->transmit_buffer == NULL)
+	{
+		printk(KERN_ERR "Allocate failure\n");
+		goto rm_buff_rec;
+	}
     sx1278->frequency		        = 433;
 	sx1278->spreadingFactor	        = SF_7;
 	sx1278->bandWidth		        = BW_125_KHZ;
@@ -125,6 +234,10 @@ static int sx1278_probe(struct spi_device *spi)
     printk(KERN_INFO "%s, %d\n", __func__, __LINE__);
     spi_set_drvdata(spi, sx1278);
     return 0;
+rm_buff_rec:
+	kfree(sx1278->receive_buffer);
+	LoRa_free(sx1278);
+	return -1;
 }
 
 static int sx1278_remove(struct spi_device *spi)
@@ -135,7 +248,8 @@ static int sx1278_remove(struct spi_device *spi)
         printk(KERN_ERR "Couldn't free\n");
         return -1;
     }
-
+	kfree(sx1278->receive_buffer);
+	kfree(sx1278->transmit_buffer);
     gpiod_set_value(sx1278->reset, 0);
     LoRa_free(sx1278);
     return 0;
@@ -162,6 +276,7 @@ static struct spi_driver sx1278_driver = {
         .owner = THIS_MODULE,
         .of_match_table = of_match_ptr(sx1278_of_match_id),
     },
+	.id_table = sx1278_id_table,
 };
 module_spi_driver(sx1278_driver);
 
