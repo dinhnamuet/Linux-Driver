@@ -13,8 +13,6 @@
 #include <linux/sched/signal.h>
 #include "sx1278.h"
 
-static LIST_HEAD(device_list);
-
 struct LoRa
 {
 	int irq;
@@ -37,7 +35,7 @@ struct LoRa
 	struct gpio_desc *reset;
 	struct gpio_desc *dio0;
 	struct class *mclass;
-	struct cdev *mcdev;
+	struct cdev mcdev;
 	struct device *mdevice;
 	struct list_head device_entry;
 	struct tasklet_struct my_tasklet;
@@ -107,22 +105,10 @@ void tasklet_fn(unsigned long args)
 }
 static int sx1278_open(struct inode *inodep, struct file *filep)
 {
-	int status = -ENXIO;
 	struct LoRa *lora = NULL;
-	list_for_each_entry(lora, &device_list, device_entry)
-	{
-		if (lora->dev_num == inodep->i_rdev)
-		{
-			status = 0;
-			break;
-		}
-	}
-	if (status)
-	{
-		printk(KERN_INFO "Device has not supported \n");
-		return status;
-	}
-	filep->private_data = lora;
+	lora = container_of(inodep->i_cdev, struct LoRa, mcdev);
+	if(lora)
+		filep->private_data = lora;
 	return 0;
 }
 static int sx1278_close(struct inode *inodep, struct file *filep)
@@ -264,11 +250,10 @@ static int sx1278_probe(struct spi_device *spi)
 		printk(KERN_ERR "Create class device failure\n");
 		goto rm_dev_num;
 	}
-	sx1278->mcdev = cdev_alloc();
-	sx1278->mcdev->owner = THIS_MODULE;
-	sx1278->mcdev->dev = sx1278->dev_num;
-	cdev_init(sx1278->mcdev, &fops);
-	if (cdev_add(sx1278->mcdev, sx1278->dev_num, 1) < 0)
+	sx1278->mcdev.owner = THIS_MODULE;
+	sx1278->mcdev.dev = sx1278->dev_num;
+	cdev_init(&sx1278->mcdev, &fops);
+	if (cdev_add(&sx1278->mcdev, sx1278->dev_num, 1) < 0)
 	{
 		printk(KERN_ERR "Cdev add failure\n");
 		goto rm_class;
@@ -319,7 +304,7 @@ rm_buff_tr:
 rm_buff_rec:
 	kfree(sx1278->receive_buffer);
 rm_cdev:
-	cdev_del(sx1278->mcdev);
+	cdev_del(&sx1278->mcdev);
 rm_device:
 	device_destroy(sx1278->mclass, sx1278->dev_num);
 rm_class:

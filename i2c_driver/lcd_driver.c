@@ -9,8 +9,6 @@
 #include <linux/device.h>
 #include "lcd_driver.h"
 
-static LIST_HEAD(list);
-
 struct lcd1602 {
 	struct i2c_client *client;
 	uint8_t backlight;
@@ -18,9 +16,8 @@ struct lcd1602 {
 	char *buffer;
 	dev_t dev_num;
 	struct class *mclass;
-	struct cdev *mcdev;
+	struct cdev mcdev;
 	struct device *mdevice;
-	struct list_head lcd_list;
 };
 static int lcd_write(struct lcd1602 *lcd, uint8_t data, uint8_t DC);
 static void lcd_init(struct lcd1602 *lcd);
@@ -32,18 +29,9 @@ static void lcd_print(struct lcd1602 *lcd, char *data);
 static int lcd_open(struct inode *inodep, struct file *filep)
 {
 	struct lcd1602 *lcd = NULL;
-	int status = -ENXIO;
-	list_for_each_entry(lcd, &list, lcd_list)
-	{
-		if(lcd->dev_num == inodep->i_rdev)
-		{
-			status = 0;
-			break;
-		}
-	}
-	if(status)
-		return status;
-	filep->private_data = lcd;
+	lcd = container_of(inodep->i_cdev, struct lcd1602, mcdev);
+	if(lcd)	
+		filep->private_data = lcd;
 	return 0;
 }
 static int lcd_close(struct inode *inodep, struct file *filep)
@@ -118,11 +106,10 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		printk(KERN_INFO "Create class failed\n");
 		goto rm_dev_num;
 	}
-	lcd->mcdev = cdev_alloc();
-	lcd->mcdev->owner = THIS_MODULE;
-	lcd->mcdev->dev = lcd->dev_num;
-	cdev_init(lcd->mcdev, &fops);
-	if (cdev_add(lcd->mcdev, lcd->dev_num, 1) < 0)
+	lcd->mcdev.owner = THIS_MODULE;
+	lcd->mcdev.dev = lcd->dev_num;
+	cdev_init(&lcd->mcdev, &fops);
+	if (cdev_add(&lcd->mcdev, lcd->dev_num, 1) < 0)
 	{
 		printk(KERN_ERR "Cdev add failure\n");
 		goto rm_class;
@@ -144,38 +131,37 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	lcd_goto_xy(lcd, 0, 1);
 	lcd_print(lcd, "LORA DRIVER");	
 
-	INIT_LIST_HEAD(&lcd->lcd_list);
-	list_add(&lcd->lcd_list, &list);
-	
 	printk(KERN_INFO "LCD Driver has been loaded\n");
 	return 0;
 	
 rm_device:
 	device_destroy(lcd->mclass, lcd->dev_num);
 rm_cdev:
-	cdev_del(lcd->mcdev);
+	cdev_del(&lcd->mcdev);
 rm_class:
 	class_destroy(lcd->mclass);
 rm_dev_num:
 	unregister_chrdev_region(lcd->dev_num, 1);
 	return -1;
 }
-static int lcd_remove(struct i2c_client *client)
+static void lcd_remove(struct i2c_client *client)
 {
 	struct lcd1602 *lcd = i2c_get_clientdata(client);
 	if(!lcd)
 	{
 		pr_err("Fault\n");
 	}
-	lcd->backlight = OFF;
-	clear_lcd(lcd);
-	kfree(lcd->buffer);
-	device_destroy(lcd->mclass, lcd->dev_num);
-	cdev_del(lcd->mcdev);
-	class_destroy(lcd->mclass);
-	unregister_chrdev_region(lcd->dev_num, 1);
-	printk(KERN_INFO "%s, %d\n", __func__, __LINE__);
-	return 0;
+	else
+	{
+		lcd->backlight = OFF;
+		clear_lcd(lcd);
+		kfree(lcd->buffer);
+		device_destroy(lcd->mclass, lcd->dev_num);
+		cdev_del(&lcd->mcdev);
+		class_destroy(lcd->mclass);
+		unregister_chrdev_region(lcd->dev_num, 1);
+		printk(KERN_INFO "%s, %d\n", __func__, __LINE__);
+	}
 }
 
 static const struct i2c_device_id lcd_match_id[] = {
