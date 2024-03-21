@@ -1,9 +1,0 @@
-#define DATA		1
-#define CMD		0
-#define EN 		0x04
-#define RW 		0x02
-#define RS 		0x01
-#define BACK_LIGHT	0x08
-#define NO_BL		0x00
-#define ON		1
-#define OFF		0
