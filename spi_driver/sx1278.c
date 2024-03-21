@@ -37,7 +37,6 @@ struct LoRa
 	struct class *mclass;
 	struct cdev mcdev;
 	struct device *mdevice;
-	struct list_head device_entry;
 	struct tasklet_struct my_tasklet;
 	struct task_struct *task;
 };
@@ -291,8 +290,6 @@ static int sx1278_probe(struct spi_device *spi)
 		printk(KERN_ERR "LoRa init failure\n");
 		goto rm_lora;
 	}
-	INIT_LIST_HEAD(&sx1278->device_entry);
-	list_add(&sx1278->device_entry, &device_list);
 	LoRa_gotoMode(sx1278, SLEEP_MODE);
 	printk(KERN_EMERG "sx1278: %s has been loaded, Cs: %d, Speed: %d, bits per word: %d!\n", sx1278->name, sx1278->spi->chip_select, sx1278->spi->max_speed_hz, sx1278->spi->bits_per_word);
 	return 0;
