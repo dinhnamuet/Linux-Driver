@@ -4,14 +4,8 @@
 #include <linux/spi/spi.h>
 #include <linux/slab.h>
 #include <linux/gpio/consumer.h>
-#include <linux/interrupt.h>
 #include <linux/of.h>
 #include <linux/delay.h>
-#include <linux/uaccess.h>
-#include <linux/cdev.h>
-#include <linux/device.h>
-#include <linux/sched/signal.h>
-#include <linux/mod_devicetable.h>
 #include <linux/timer.h>
 #include <linux/ktime.h>
 #include <linux/timekeeping.h>
@@ -26,8 +20,6 @@ struct nokia {
 	struct gpio_desc *reset;
 	struct gpio_desc *dc;
 	struct gpio_desc *led;
-	struct cdev *mcdev;
-	struct device *mdevice;
 
 	struct timer_list tm_list;
 	struct kern_time time;
@@ -114,7 +106,7 @@ static int nokia_probe(struct spi_device *spi)
 	spi_set_drvdata(spi, lcd);
 	lcd->spi->mode = SPI_MODE_0;
 	lcd->spi->bits_per_word = 8;
-	lcd->spi->max_speed_hz = 2000000;
+	lcd->spi->max_speed_hz = 1500000;
 	if (spi_setup(lcd->spi) < 0)
 	{
 		printk(KERN_ERR "SPI setup failed\n");
@@ -124,7 +116,7 @@ static int nokia_probe(struct spi_device *spi)
 	lcd_init(lcd);
 
 	lcd_goto_XY(lcd, 0, 0);
-	lcd_send_string(lcd, " DONG HO NOKIA", 1);
+	lcd_send_string(lcd, "  NOKIA-5110  ", 1);
 
 	INIT_WORK(&lcd->my_work, work_fn);
 	timer_setup(&lcd->tm_list, polling, 0);
@@ -180,11 +172,11 @@ void lcd_init(struct nokia *lcd)
 {
 	lcd_reset(lcd);
 	lcd_write_one_byte(lcd, ADD_CMD, COMMAND); // Using the additional commands
-	lcd_write_one_byte(lcd, SET_VOP | 0x40, COMMAND);
+	lcd_write_one_byte(lcd, SET_VOP | 0x43, COMMAND);
 	lcd_write_one_byte(lcd, BASIC_CMD, COMMAND); // Using the basic command
 	lcd_write_one_byte(lcd, DISP_CTL | DP_NORMAL, COMMAND);
 	lcd_clear(lcd);
-//	led_on(lcd);
+	led_on(lcd);
 }
 void lcd_reset(struct nokia *lcd)
 {
