@@ -15,7 +15,6 @@
 #define COMMAND 0
 
 struct nokia {
-	dev_t dev_num;
 	struct spi_device *spi;
 	struct gpio_desc *reset;
 	struct gpio_desc *dc;
