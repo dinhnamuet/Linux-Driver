@@ -4,10 +4,8 @@
 #include <linux/serdev.h>
 #include <linux/of.h>
 #include <linux/slab.h>
-#include <linux/container_of.h>
 struct uart_dev {
     struct serdev_device *serdev;
-    struct device dev;
 };
 static int uart_recv(struct serdev_device *serdev, const uint8_t *buff, size_t size)
 {
@@ -36,7 +34,6 @@ static int uart_probe(struct serdev_device *serdev)
         return -1;
     }
     cp2102->serdev = serdev;
-    cp2102->dev = serdev->dev;
     serdev_device_set_drvdata(serdev, cp2102);
     serdev_device_set_client_ops(cp2102->serdev, &sops);
     if(serdev_device_open(cp2102->serdev) != 0)
@@ -85,5 +82,5 @@ module_serdev_device_driver(uart_driver);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("DinhNam <20021163@vnu.edu.vn>");
-MODULE_DESCRIPTION("Uart driver");
+MODULE_DESCRIPTION("UART Driver");
 MODULE_VERSION("1.0");
