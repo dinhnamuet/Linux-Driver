@@ -5,31 +5,29 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
-#include <linux/cdev.h>
-#include <linux/device.h>
+#include <linux/miscdevice.h>
+#include <linux/netdevice.h>
 #include "lcd_driver.h"
 
 struct lcd1602 {
 	struct i2c_client *client;
 	uint8_t backlight;
-
 	char *buffer;
-	dev_t dev_num;
-	struct class *mclass;
-	struct cdev mcdev;
-	struct device *mdevice;
+	struct miscdevice misdev;
 };
+
 static int lcd_write(struct lcd1602 *lcd, uint8_t data, uint8_t DC);
 static void lcd_init(struct lcd1602 *lcd);
 static void lcd_goto_xy(struct lcd1602 *lcd, uint8_t x, uint8_t y);
 static void clear_lcd(struct lcd1602 *lcd);
 static void clear_row(struct lcd1602 *lcd, uint8_t row);
 static void lcd_print(struct lcd1602 *lcd, char *data);
+static int get_network_status_by_name(const char *name);
 
 static int lcd_open(struct inode *inodep, struct file *filep)
 {
 	struct lcd1602 *lcd = NULL;
-	lcd = container_of(inodep->i_cdev, struct lcd1602, mcdev);
+	lcd = container_of(filep->private_data, struct lcd1602, misdev);
 	if(lcd)	
 		filep->private_data = lcd;
 	return 0;
@@ -94,55 +92,32 @@ static int lcd_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	i2c_set_clientdata(client, lcd);
 	lcd->backlight = ON;
 	lcd_init(lcd);
-
-	if (alloc_chrdev_region(&lcd->dev_num, 0, 1, DEV_NAME) < 0)
-	{
-		printk(KERN_ERR "Allocate device number failure!\n");
-		return -1;
-	}
-	lcd->mclass = class_create(THIS_MODULE, DEV_NAME);
-	if(lcd->mclass == NULL)
-	{
-		printk(KERN_INFO "Create class failed\n");
-		goto rm_dev_num;
-	}
-	lcd->mcdev.owner = THIS_MODULE;
-	lcd->mcdev.dev = lcd->dev_num;
-	cdev_init(&lcd->mcdev, &fops);
-	if (cdev_add(&lcd->mcdev, lcd->dev_num, 1) < 0)
-	{
-		printk(KERN_ERR "Cdev add failure\n");
-		goto rm_class;
-	}
-	lcd->mdevice = device_create(lcd->mclass, NULL, lcd->dev_num, NULL, DEV_NAME);
-	if (lcd->mdevice == NULL)
-	{
-		printk(KERN_ERR "create device failure\n");
-		goto rm_cdev;
-	}
 	lcd->buffer = kzalloc(16, GFP_KERNEL);
 	if (lcd->buffer == NULL)
 	{
 		printk(KERN_ERR "Allocate memory failure\n");
-		goto rm_device;
+		return -1;
 	}
+	lcd->misdev.minor	= MISC_DYNAMIC_MINOR;
+	lcd->misdev.name	= "lcd1602";
+	lcd->misdev.fops	= &fops;
+	if(misc_register(&lcd->misdev) < 0)
+	{
+		printk(KERN_ERR "Misc Register failed\n");
+		kfree(lcd->buffer);
+		return -1;
+	}
+
 	lcd_goto_xy(lcd, 0, 0);
 	lcd_print(lcd, "Hello World!");
 	lcd_goto_xy(lcd, 0, 1);
-	lcd_print(lcd, "LORA DRIVER");	
+	if(get_network_status_by_name("wlan0") == 0)
+		lcd_print(lcd, "Wifi okay!");
+	else
+		lcd_print(lcd, "Wifi disable!");
 
 	printk(KERN_INFO "LCD Driver has been loaded\n");
 	return 0;
-	
-rm_device:
-	device_destroy(lcd->mclass, lcd->dev_num);
-rm_cdev:
-	cdev_del(&lcd->mcdev);
-rm_class:
-	class_destroy(lcd->mclass);
-rm_dev_num:
-	unregister_chrdev_region(lcd->dev_num, 1);
-	return -1;
 }
 static void lcd_remove(struct i2c_client *client)
 {
@@ -156,24 +131,16 @@ static void lcd_remove(struct i2c_client *client)
 		lcd->backlight = OFF;
 		clear_lcd(lcd);
 		kfree(lcd->buffer);
-		device_destroy(lcd->mclass, lcd->dev_num);
-		cdev_del(&lcd->mcdev);
-		class_destroy(lcd->mclass);
-		unregister_chrdev_region(lcd->dev_num, 1);
+		misc_deregister(&lcd->misdev);
 		printk(KERN_INFO "%s, %d\n", __func__, __LINE__);
 	}
 }
-
-static const struct i2c_device_id lcd_match_id[] = {
-	{"lcd-1602", 0},
-	{ }
-};
-MODULE_DEVICE_TABLE(i2c, lcd_match_id);
 
 static const struct of_device_id lcd_of_match[] = {
 	{ .compatible = "lcd1602,nam", },
 	{	}
 };
+
 MODULE_DEVICE_TABLE(of, lcd_of_match);
 
 static struct i2c_driver lcd_driver = {
@@ -184,7 +151,6 @@ static struct i2c_driver lcd_driver = {
 		.owner = THIS_MODULE,
 		.of_match_table = of_match_ptr(lcd_of_match),
 	},
-	.id_table = lcd_match_id,
 };
 
 module_i2c_driver(lcd_driver);
@@ -262,6 +228,17 @@ static void lcd_print(struct lcd1602 *lcd, char *data)
 	{
 		lcd_write(lcd, *data++, DATA);
 	}
+}
+static int get_network_status_by_name(const char *name)
+{
+    struct net_device *dev = NULL;
+    dev = dev_get_by_name(&init_net, name);
+    if (dev)
+    {
+        if (netif_carrier_ok(dev))
+            return 0;
+    }
+    return -1;
 }
 
 MODULE_LICENSE("GPL");

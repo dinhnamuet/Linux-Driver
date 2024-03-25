@@ -10,7 +10,6 @@ int main()
 {
 	char a[10];
 	int fd;
-	lcd_init();
 	while(1)
 	{
 		fd = open(TEM, O_RDONLY);
