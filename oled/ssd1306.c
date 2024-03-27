@@ -201,18 +201,18 @@ static void ssd1306_send_char(struct ssd1306 *oled, uint8_t data)
 {
 	if (oled->current_X == max_X)
 		ssd1306_go_to_next_line(oled);
-	ssd1306_burst_write(oled, ssd1306_font[data-32], 6, DATA);
+	ssd1306_burst_write(oled, ssd1306_font[data-32], FONT_X, DATA);
 	oled->current_X++;
 }
 static void ssd1306_send_char_inv(struct ssd1306 *oled, uint8_t data)
 {
 	uint8_t i;
-	uint8_t buff[6];
+	uint8_t buff[FONT_X];
 	if (oled->current_X == max_X)
 		ssd1306_go_to_next_line(oled);
-	for ( i = 0; i < 6; i++)
+	for ( i = 0; i < FONT_X; i++)
 		buff[i] = ~ssd1306_font[data-32][i];
-	ssd1306_burst_write(oled, buff, 6, DATA);
+	ssd1306_burst_write(oled, buff, FONT_X, DATA);
 	oled->current_X++;
 }
 static void ssd1306_send_string(struct ssd1306 *oled, uint8_t *str, color_t color)
