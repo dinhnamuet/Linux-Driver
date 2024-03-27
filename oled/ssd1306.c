@@ -29,11 +29,12 @@ static void ssd1306_send_char_inv(struct ssd1306 *oled, uint8_t data);
 static void ssd1306_send_string(struct ssd1306 *oled, uint8_t *str, color_t color);
 static void ssd1306_go_to_next_line(struct ssd1306 *oled);
 static void ssd1306_draw_pixel(struct ssd1306 *oled, uint8_t x, uint8_t y, color_t color);
-static void ssd1306_draw_bitmap(struct ssd1306 *oled, uint8_t x, uint8_t y, const uint8_t *bitmap, uint8_t width, uint8_t height);
+static void ssd1306_draw_bitmap(struct ssd1306 *oled, uint8_t x, uint8_t y, const uint8_t *bitmap, uint8_t width, uint8_t height, color_t color);
 static int ssd1306_burst_write(struct ssd1306 *oled, uint8_t *data, int len, write_mode_t mode);
 static void ssd1306_sync(struct ssd1306 *oled);
 static void animation(struct work_struct *work);
 static void tmHandler(struct timer_list *tm);
+
 static int oled_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	struct ssd1306 *oled = NULL;
@@ -170,7 +171,7 @@ static void ssd1306_init(struct ssd1306 *oled)
 	// disable entire display on
 	ssd1306_write(oled, 0xA4, COMMAND);
 	// set normal display
-	ssd1306_write(oled, 0xA6, COMMAND);
+	ssd1306_write(oled, 0xA6, COMMAND); //A6 normal a7 inverse
 	// set segment re-map
 	ssd1306_write(oled, 0xA0, COMMAND);
 	// deactive scroll
@@ -236,13 +237,14 @@ static void ssd1306_draw_pixel(struct ssd1306 *oled, uint8_t x, uint8_t y, color
 static void ssd1306_sync(struct ssd1306 *oled)
 {
 	ssd1306_burst_write(oled, oled->buffer, OLED_WIDTH * OLED_HEIGHT / 8, DATA);
+	memset(oled->buffer, 0, 1024);
 }
 static void ssd1306_go_to_next_line(struct ssd1306 *oled)
 {
 	oled->current_Y = (oled->current_Y == max_Y) ? 0 : (oled->current_Y + 1);
 	ssd1306_goto_xy(oled, 0, oled->current_Y);
 }
-static void ssd1306_draw_bitmap(struct ssd1306 *oled, uint8_t x, uint8_t y, const uint8_t *bitmap, uint8_t width, uint8_t height)
+static void ssd1306_draw_bitmap(struct ssd1306 *oled, uint8_t x, uint8_t y, const uint8_t *bitmap, uint8_t width, uint8_t height, color_t color)
 {
 	int16_t byteWidth = (width + 7) / 8;
     uint8_t byte = 0;
@@ -255,7 +257,7 @@ static void ssd1306_draw_bitmap(struct ssd1306 *oled, uint8_t x, uint8_t y, cons
             else
                byte = (*(const unsigned char *)(&bitmap[j * byteWidth + i / 8]));
             if(byte & 0x80) 
-				ssd1306_draw_pixel(oled, x+i, y, COLOR_WHITE);
+				ssd1306_draw_pixel(oled, x+i, y, color);
         }
     }
 }
@@ -265,14 +267,13 @@ static void animation(struct work_struct *work)
 	struct ssd1306 *oled = container_of(work, struct ssd1306, workqueue);
 	if(oled)
 	{
-		ssd1306_clear(oled);
 		for (i = 0; i < 28; i ++)
 		{
-			ssd1306_draw_bitmap(oled, 25, 0, frames[i], 64, 64);
+			ssd1306_draw_bitmap(oled, 25, 0, frames[i], 64, 64, COLOR_WHITE);
 			ssd1306_sync(oled);
+			msleep(10);
 		}
 	}
-	memset(oled->buffer, 0, 1024);
 	mod_timer(&oled->my_timer, jiffies + HZ/2);
 }
 static void tmHandler(struct timer_list *tm)
