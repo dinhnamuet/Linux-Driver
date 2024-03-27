@@ -28,9 +28,9 @@ static void ssd1306_send_char(struct ssd1306 *oled, uint8_t data);
 static void ssd1306_send_char_inv(struct ssd1306 *oled, uint8_t data);
 static void ssd1306_send_string(struct ssd1306 *oled, uint8_t *str, color_t color);
 static void ssd1306_go_to_next_line(struct ssd1306 *oled);
-static void ssd1306_draw_pixel(struct ssd1306 *oled, uint8_t x, uint8_t y, color_t color);
+static int ssd1306_draw_pixel(struct ssd1306 *oled, uint8_t x, uint8_t y, color_t color);
 static void ssd1306_draw_bitmap(struct ssd1306 *oled, uint8_t x, uint8_t y, const uint8_t *bitmap, uint8_t width, uint8_t height, color_t color);
-static int ssd1306_burst_write(struct ssd1306 *oled, uint8_t *data, int len, write_mode_t mode);
+static int ssd1306_burst_write(struct ssd1306 *oled, const uint8_t *data, int len, write_mode_t mode);
 static void ssd1306_sync(struct ssd1306 *oled);
 static void animation(struct work_struct *work);
 static void tmHandler(struct timer_list *tm);
@@ -76,14 +76,12 @@ static void oled_remove(struct i2c_client *client)
 	}
 }
 static const struct i2c_device_id oled_device_id[] = {
-	{.name = "nam", 0},
+	{ .name = "nam", 0 },
 	{}
 };
 MODULE_DEVICE_TABLE(i2c, oled_device_id);
 static const struct of_device_id oled_of_match_id[] = {
-	{
-		.compatible = "ssd1306-oled,nam",
-	},
+	{ .compatible = "ssd1306-oled,nam", },
 	{}
 };
 MODULE_DEVICE_TABLE(of, oled_of_match_id);
@@ -116,7 +114,7 @@ static void ssd1306_write(struct ssd1306 *oled, uint8_t data, write_mode_t mode)
 	buff[1] = data;
 	i2c_master_send(oled->client, buff, 2);
 }
-static int ssd1306_burst_write(struct ssd1306 *oled, uint8_t *data, int len, write_mode_t mode)
+static int ssd1306_burst_write(struct ssd1306 *oled, const uint8_t *data, int len, write_mode_t mode)
 {
 	int res;
 	uint8_t *buff;
@@ -184,7 +182,7 @@ static void ssd1306_init(struct ssd1306 *oled)
 static void ssd1306_clear(struct ssd1306 *oled)
 {
 	int i;
-	for (i = 0; i < 1024; i++)
+	for ( i = 0; i < 1024; i++ )
 		ssd1306_write(oled, 0, DATA);
 	ssd1306_goto_xy(oled, 0, 0);
 }
@@ -201,20 +199,20 @@ static void ssd1306_goto_xy(struct ssd1306 *oled, uint8_t x, uint8_t y)
 }
 static void ssd1306_send_char(struct ssd1306 *oled, uint8_t data)
 {
-	uint8_t i;
 	if (oled->current_X == max_X)
 		ssd1306_go_to_next_line(oled);
-	for (i = 0; i < FONT_X; i++)
-		ssd1306_write(oled, ssd1306_font[data - 32][i], DATA);
+	ssd1306_burst_write(oled, ssd1306_font[data-32], 6, DATA);
 	oled->current_X++;
 }
 static void ssd1306_send_char_inv(struct ssd1306 *oled, uint8_t data)
 {
 	uint8_t i;
+	uint8_t buff[6];
 	if (oled->current_X == max_X)
 		ssd1306_go_to_next_line(oled);
-	for (i = 0; i < FONT_X; i++)
-		ssd1306_write(oled, ~ssd1306_font[data - 32][i], DATA);
+	for ( i = 0; i < 6; i++)
+		buff[i] = ~ssd1306_font[data-32][i];
+	ssd1306_burst_write(oled, buff, 6, DATA);
 	oled->current_X++;
 }
 static void ssd1306_send_string(struct ssd1306 *oled, uint8_t *str, color_t color)
@@ -227,12 +225,15 @@ static void ssd1306_send_string(struct ssd1306 *oled, uint8_t *str, color_t colo
 			ssd1306_send_char_inv(oled, *str++);
 	}
 }
-static void ssd1306_draw_pixel(struct ssd1306 *oled, uint8_t x, uint8_t y, color_t color)
+static int ssd1306_draw_pixel(struct ssd1306 *oled, uint8_t x, uint8_t y, color_t color)
 {
+	if(x > OLED_WIDTH || y > OLED_HEIGHT)
+		return -1;
 	if(color == COLOR_WHITE)
 		oled->buffer[x + (y/8)*OLED_WIDTH] |= (1<<(y % 8));
 	else
 		oled->buffer[x + (y/8)*OLED_WIDTH] &= ~(1<<(y % 8));
+	return 0;
 }
 static void ssd1306_sync(struct ssd1306 *oled)
 {
@@ -271,7 +272,6 @@ static void animation(struct work_struct *work)
 		{
 			ssd1306_draw_bitmap(oled, 25, 0, frames[i], 64, 64, COLOR_WHITE);
 			ssd1306_sync(oled);
-			msleep(10);
 		}
 	}
 	mod_timer(&oled->my_timer, jiffies + HZ/2);
