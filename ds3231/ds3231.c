@@ -156,7 +156,7 @@ static u8 ds3232_read_time(struct ds3231 *rtc)
     rtc->time.month  = decodeBCD8(ds3231_read8(rtc, DS3231_REG_MONTH));
     rtc->time.year   = decodeBCD16(ds3231_read16(rtc, DS3231_REG_YEAR));
     day              = decodeBCD8(ds3231_read8(rtc, DS3231_REG_DAY));
-    memset(rtc->time.day, 0, sizeof(day));
+    memset(rtc->time.day, 0, sizeof(rtc->time.day));
     switch(day)
     {
         case 1:
