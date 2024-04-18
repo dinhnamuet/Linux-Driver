@@ -103,7 +103,7 @@ static u8 decodeBCD8(u8 value)
 }
 static u16 decodeBCD16(u16 value)
 {
-    return (((u16)((value & 0xf000) >> 12)) * 1000) + (((u16)((value & 0x0f00) >> 8)) * 100) + (((u16)((value & 0xf0) >> 4)) * 10) + (value & 0x0f);
+    return (((value & 0xf000) >> 12) * 1000) + (((value & 0x0f00) >> 8) * 100) + (((value & 0xf0) >> 4) * 10) + (value & 0x0f);
 }
 static u8 ds3231_write8(struct ds3231 *rtc, u8 reg, u8 value)
 {
@@ -125,7 +125,7 @@ static void ds3231_update_real_time(struct ds3231 *rtc)
 {
     time64_t second;
     struct tm time_info;
-    second = ktime_to_ns(ktime_get_real())/NSEC_PER_SEC; //gmt + 7 tick to seconds
+    second = ktime_to_ns(ktime_get_real())/NSEC_PER_SEC;
     time64_to_tm(second, 7*3600, &time_info);
 
     ds3231_write8(rtc, DS3231_REG_DAY, encodeBCD8(time_info.tm_wday));
@@ -188,3 +188,6 @@ static u8 ds3232_read_time(struct ds3231 *rtc)
 module_i2c_driver(ds3231_drv);
 
 MODULE_LICENSE("GPL");
+MODULE_AUTHOR("DinhNam <20021163@vnu.edu.vn>");
+MODULE_DESCRIPTION("I2C SMBUS Test for DS3231");
+MODULE_VERSION("1.0");
