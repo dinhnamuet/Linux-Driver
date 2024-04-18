@@ -1,1 +1,0 @@
-savedcmd_/home/namubuntu/Desktop/Linux-Driver/ds3231/Module.symvers :=  scripts/mod/modpost -M -m -a      -o /home/namubuntu/Desktop/Linux-Driver/ds3231/Module.symvers -T /home/namubuntu/Desktop/Linux-Driver/ds3231/modules.order -i Module.symvers -e 

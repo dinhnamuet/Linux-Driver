@@ -1,1 +1,0 @@
-savedcmd_/home/namubuntu/Desktop/Linux-Driver/ds3231/ds3231.mod := printf '%s\n'   ds3231.o | awk '!x[$$0]++ { print("/home/namubuntu/Desktop/Linux-Driver/ds3231/"$$0) }' > /home/namubuntu/Desktop/Linux-Driver/ds3231/ds3231.mod
