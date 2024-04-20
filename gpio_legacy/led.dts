@@ -1,0 +1,8 @@
+&soc {
+        led@7e200000 {
+                #address-cells = <1>;
+                compatible = "myled";
+                reg = <0x7e200000 0xf0>;
+                status = "okay";
+        };
+};
