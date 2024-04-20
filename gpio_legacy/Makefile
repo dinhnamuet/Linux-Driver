@@ -1,11 +1,9 @@
-BBB_KERNEL := /home/nam/linux/kernelbuildscripts/KERNEL
-TOOLCHAIN := /home/nam/linux/kernelbuildscripts/dl/gcc-8.5.0-nolibc/arm-linux-gnueabi/bin/arm-linux-gnueabi-
+KERNEL := /home/namubuntu/linux
+TOOLCHAIN := aarch64-linux-gnu-
 
-EXTRA_CFLAGS=-Wall
-obj-m := led.o
-
+EXTRA_CFLAGS = -Wall
+obj-m += myled.o
 all:
-	make ARCH=arm CROSS_COMPILE=$(TOOLCHAIN) -C $(BBB_KERNEL) M=$(shell pwd) modules
-	
+	make ARCH=arm64 CROSS_COMPILE=${TOOLCHAIN} -C ${KERNEL} M=`pwd` modules
 clean:
-	make -C $(BBB_KERNEL) M=$(shell pwd) clean
+	make -C ${KERNEL} M=`pwd` clean
