@@ -1,0 +1,15 @@
+&pwm {
+    #pwm-cells = <2>;
+    pinctrl-names = "default";
+    pinctrl-0 = <&pwm0_0_gpio12 &pwm0_1_gpio13>;
+    status = "okay";
+};
+
+/ {
+    pwmled {
+        compatible = "pwmled";
+        pwms = <&pwm 0 1000000>, <&pwm 1 2000000>;
+        pwm-names = "led1", "led2";
+        status = "okay";
+     };
+};
