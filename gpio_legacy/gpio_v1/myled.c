@@ -5,6 +5,7 @@
 #include <linux/platform_device.h>
 #include <linux/of.h>
 #include <linux/io.h>
+#include <linux/device.h>
 #include "myled.h"
 struct led_test {
     u32 __iomem *base;
@@ -22,7 +23,7 @@ static int led_probe(struct platform_device *pdev)
     res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
     if(!res)
         return -ENODEV;
-    led->base = (u32 *)ioremap(res->start, 0xF0);
+    led->base = (u32 *)devm_ioremap(&pdev->dev, res->start, 0xF0);
     if(!led->base)
         return -ENOMEM;
     /* config out put */
@@ -46,7 +47,6 @@ static int led_remove(struct platform_device *pdev)
     regval = ioread32(led->base + GPCLR0_OFFSET/4);
     regval |= 0x01 << 16;
     iowrite32(regval, led->base + GPCLR0_OFFSET/4);
-    iounmap(led->base);
     pr_info("Led is off!\n");
     return 0;
 }
