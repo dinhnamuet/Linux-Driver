@@ -20,7 +20,7 @@
 #define DS3231_A2_DATE		0x0d
 
 #define DS3231_REG_CONTROL  0x0e
-#define DS3231_REG_STATUS   0x0F
+#define DS3231_REG_STATUS   0x0f
 
 typedef struct {
     u8 date;
@@ -32,5 +32,8 @@ typedef struct {
     u8 min;
     u8 sec;
 } date_t;
+
+#define UPDATE_TIME _IO('U', 1)
+#define GET_TIME _IOR('G', 1, date_t *)
 
 #endif
