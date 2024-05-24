@@ -3,7 +3,6 @@
 #include <linux/i2c.h>
 #include <linux/of.h>
 #include <linux/timer.h>
-#include <linux/workqueue.h>
 #include <linux/ktime.h>
 #include <linux/time.h>
 #include <linux/regmap.h>
@@ -13,7 +12,7 @@
 #include "ds3231.h"
 struct ds3231 {
     struct i2c_client *client;
-    struct regmap *regmap;
+//    struct regmap *regmap;
     struct miscdevice myRtc;
 };
 
@@ -31,7 +30,7 @@ static u8 ds3231_read_time(struct ds3231 *rtc, date_t *time);
 static int ds3231_open(struct inode *inodep, struct file *filep);
 static int ds3231_close(struct inode *inodep, struct file *filep);
 static long ds3231_ioctl (struct file *filep, unsigned int cmd, unsigned long data);
-
+/*
 static const struct regmap_range ds3231_ranges[] = {
     {.range_min = 0x00, .range_max = 0x0F},
 };
@@ -47,7 +46,7 @@ static struct regmap_config ds3231_reg_conf = {
     .cache_type = REGCACHE_RBTREE,
     .name = "ds3231",
 };
-
+*/
 static struct file_operations fops = {
     .owner = THIS_MODULE,
     .open = ds3231_open,
@@ -61,9 +60,11 @@ static int ds3231_probe(struct i2c_client *client)
     rtc = devm_kzalloc(&client->dev, sizeof(*rtc), GFP_KERNEL);
     if (!rtc)
         return -ENOMEM;
+    /*
     rtc->regmap = devm_regmap_init_i2c(client, &ds3231_reg_conf);
     if (IS_ERR(rtc->regmap))
         return PTR_ERR(rtc->regmap);
+    */
     i2c_set_clientdata(client, rtc);
     rtc->client = client;
     /* miscdevice register */
@@ -118,27 +119,27 @@ static u16 decodeBCD16(u16 value)
 }
 static u8 ds3231_write8(struct ds3231 *rtc, u8 reg, u8 value)
 {
-    // return i2c_smbus_write_byte_data(rtc->client, reg, value);
-    return regmap_write(rtc->regmap, reg, value);
+     return i2c_smbus_write_byte_data(rtc->client, reg, value);
+    //return regmap_write(rtc->regmap, reg, value);
 }
 static u8 ds3231_write16(struct ds3231 *rtc, u8 reg, u16 value)
 {
-    // return i2c_smbus_write_word_data(rtc->client, reg, value);
-    return regmap_noinc_write(rtc->regmap, reg, &value, 2);
+     return i2c_smbus_write_word_data(rtc->client, reg, value);
+    //return regmap_noinc_write(rtc->regmap, reg, &value, 2);
 }
 static u8 ds3231_read8(struct ds3231 *rtc, u8 reg)
 {
-    // return i2c_smbus_read_byte_data(rtc->client, reg);
-    int rd;
-    regmap_read(rtc->regmap, reg, &rd);
-    return (u8)rd;
+     return i2c_smbus_read_byte_data(rtc->client, reg);
+//    int rd;
+//    regmap_read(rtc->regmap, reg, &rd);
+//    return (u8)rd;
 }
 static u16 ds3231_read16(struct ds3231 *rtc, u8 reg)
 {
-    // return i2c_smbus_read_word_data(rtc->client, reg);
-    u16 rd;
-    regmap_noinc_read(rtc->regmap, reg, &rd, 2);
-    return rd;
+     return i2c_smbus_read_word_data(rtc->client, reg);
+//    u16 rd;
+//    regmap_noinc_read(rtc->regmap, reg, &rd, 2);
+//    return rd;
 }
 static void ds3231_update_real_time(struct ds3231 *rtc)
 {
@@ -174,32 +175,8 @@ static u8 ds3231_read_time(struct ds3231 *rtc, date_t *time)
     time->month = decodeBCD8(ds3231_read8(rtc, DS3231_REG_MONTH));
     time->year = decodeBCD16(ds3231_read16(rtc, DS3231_REG_YEAR));
     day = decodeBCD8(ds3231_read8(rtc, DS3231_REG_DAY));
-    memset(time->day, 0, sizeof(time->day));
-    switch (day) {
-        case 1:
-            strncpy(time->day, "Monday", strlen("Monday"));
-            break;
-        case 2:
-            strncpy(time->day, "Tuesday", strlen("Tuesday"));
-            break;
-        case 3:
-            strncpy(time->day, "Wednesday", strlen("Wednesday"));
-            break;
-        case 4:
-            strncpy(time->day, "Thursday", strlen("Thursday"));
-            break;
-        case 5:
-            strncpy(time->day, "Friday", strlen("Friday"));
-            break;
-        case 6:
-            strncpy(time->day, "Saturday", strlen("Saturday"));
-            break;
-        case 7:
-            strncpy(time->day, "Sunday ", strlen("Sunday "));
-            break;
-        default:
-            break;
-    }
+    memset(time->day, 0, 10);
+    memcpy(time->day, day_of_weak[day - 1], strlen(day_of_weak[day - 1]));
     return 0;
 }
 
@@ -220,8 +197,9 @@ static int ds3231_close(struct inode *inodep, struct file *filep)
 }
 static long ds3231_ioctl (struct file *filep, unsigned int cmd, unsigned long data)
 {
+    long res;
     struct ds3231 *rtc = filep->private_data;
-    date_t *time = (date_t *)data;
+    date_t time;
     if (!rtc)
         return -EFAULT;
     switch (cmd) {
@@ -229,12 +207,13 @@ static long ds3231_ioctl (struct file *filep, unsigned int cmd, unsigned long da
             ds3231_update_real_time(rtc);
             break;
         case GET_TIME:
-            ds3231_read_time(rtc, time);
+            ds3231_read_time(rtc, &time);
+            res = copy_to_user((date_t *)data, &time, sizeof(date_t));
             break;
         default:
             break;
     }
-    return 0;
+    return res;
 }
 
 module_i2c_driver(ds3231_drv);

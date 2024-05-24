@@ -44,7 +44,6 @@ static int update_time(int *fd) {
 static int get_time(int *fd, date_t *time) {
     return ioctl(*fd, GET_TIME, time);
 }
-static void stop_rtc(int *fd)
-{
+static void stop_rtc(int *fd) {
     close(*fd);
 }

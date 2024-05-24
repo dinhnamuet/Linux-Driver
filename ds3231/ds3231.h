@@ -22,16 +22,28 @@
 #define DS3231_REG_CONTROL  0x0e
 #define DS3231_REG_STATUS   0x0f
 
+typedef unsigned char u8;
+typedef unsigned short u16;
+
 typedef struct {
     u8 date;
     u8 month;
     u16 year;
-    char day[10];
-
     u8 hour;
     u8 min;
     u8 sec;
+    char day[10];
 } date_t;
+
+const char day_of_weak[7][9] = {
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday"
+};
 
 #define UPDATE_TIME _IO('U', 1)
 #define GET_TIME _IOR('G', 1, date_t *)

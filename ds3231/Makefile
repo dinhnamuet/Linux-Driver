@@ -5,5 +5,7 @@ EXTRA_CFLAGS = -Wall
 obj-m += ds3231.o
 all:
 	make ARCH=arm64 CROSS_COMPILE=${TOOLCHAIN} -C ${KERNEL} M=`pwd` modules
+	${TOOLCHAIN}gcc -o test test_ioctl.c
 clean:
 	make ARCH=arm64 -C ${KERNEL} M=`pwd` clean
+	rm test
