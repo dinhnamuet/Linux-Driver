@@ -167,5 +167,5 @@ module_i2c_driver(ds3231_drv);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("DinhNam <20021163@vnu.edu.vn>");
-MODULE_DESCRIPTION("I2C Regmap Test for DS3231");
+MODULE_DESCRIPTION("I2C Driver for DS3231");
 MODULE_VERSION("1.0");
