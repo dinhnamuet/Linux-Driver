@@ -1,9 +1,9 @@
-KERNEL:=/home/namubuntu/linux
-TOOLCHAIN:=aarch64-linux-gnu-
-
-EXTRA_CFLAGS = -Wall
-obj-m += mydriver.o
+KERNEL=../linux
+TOOLCHAIN=arm-linux-gnueabihf-
+obj-m += mySensor.o
 all:
-	make ARCH=arm64 CROSS_COMPILE=${TOOLCHAIN} -C ${KERNEL} M=`pwd` modules
+	make ARCH=arm CROSS_COMPILE=${TOOLCHAIN} -C ${KERNEL} M=`pwd` modules
+	${TOOLCHAIN}gcc -o test main.c dht_ioctl.c -I .
 clean:
-	make ARCH=arm64 -C ${KERNEL} M=`pwd` clean
+	make ARCH=arm CROSS_COMPILE=${TOOLCHAIN} -C ${KERNEL} M=`pwd` clean
+	rm test
