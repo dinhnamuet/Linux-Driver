@@ -4,7 +4,7 @@
 #include <sys/ioctl.h>
 #include <stdlib.h>
 #include <string.h>
-#include "mySensor.h"
+#include "dht11.h"
 static double combine_result(u8 integer, u8 decimal) {
     char a[7];
     memset(a, 0, 7);

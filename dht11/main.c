@@ -4,7 +4,7 @@
 #include <sys/ioctl.h>
 #include <stdlib.h>
 #include <string.h>
-#include "mySensor.h"
+#include <dht11.h>
 
 int main(int argc, char *argv[]) {
    double temperature, humidity;
@@ -13,7 +13,7 @@ int main(int argc, char *argv[]) {
         // humidity = dht11_read_property(DHT11, HUMIDITY);
         if (!dht11_read_all(DHT11, &temperature, &humidity))
             printf("Temperature: %.2f°C, Humidity: %.2f\n", temperature, humidity);
-        sleep(1.5);
+        sleep(2);
     }
     return 0;
 }
